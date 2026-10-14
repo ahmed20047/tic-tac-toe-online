@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>إكس أو - أونلاين</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;900&display=swap" rel="stylesheet" />
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      font-family: "Cairo", sans-serif;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      color: #eee;
+      padding: 20px;
+    }
+
+    .container {
+      width: 100%;
+      max-width: 420px;
+      text-align: center;
+    }
+
+    h1 {
+      font-size: 2.2rem;
+      font-weight: 900;
+      margin-bottom: 24px;
+      background: linear-gradient(90deg, #ff6b6b, #4ecdc4);
+      -webkit-background-clip: text;
+      background-clip: text;
+      -webkit-text-fill-color: transparent;
+    }
+
+    .card {
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      border-radius: 20px;
+      padding: 28px;
+      backdrop-filter: blur(10px);
+    }
+
+    .btn {
+      font-family: inherit;
+      font-size: 1.05rem;
+      font-weight: 700;
+      padding: 14px 24px;
+      border: none;
+      border-radius: 12px;
+      cursor: pointer;
+      width: 100%;
+      margin-top: 12px;
+      transition: transform 0.15s, filter 0.15s;
+    }
+    .btn:hover { transform: translateY(-2px); filter: brightness(1.15); }
+    .btn-primary { background: linear-gradient(90deg, #ff6b6b, #ee5253); color: #fff; }
+    .btn-secondary { background: rgba(78, 205, 196, 0.2); color: #4ecdc4; border: 2px solid #4ecdc4; }
+
+    input {
+      font-family: inherit;
+      width: 100%;
+      padding: 14px;
+      margin-top: 12px;
+      border-radius: 12px;
+      border: 2px solid rgba(255, 255, 255, 0.2);
+      background: rgba(0, 0, 0, 0.25);
+      color: #fff;
+      font-size: 1.2rem;
+      text-align: center;
+      letter-spacing: 8px;
+      text-transform: uppercase;
+      direction: ltr;
+    }
+    input:focus { outline: none; border-color: #4ecdc4; }
+    input::placeholder { letter-spacing: 2px; font-size: 1rem; color: rgba(255,255,255,0.4); }
+
+    .error { color: #ff6b6b; margin-top: 10px; font-size: 0.95rem; min-height: 1.4em; }
+    .hidden { display: none; }
+
+    /* ---- شاشة الغرفة ---- */
+    .room-code-box {
+      background: rgba(0, 0, 0, 0.3);
+      border-radius: 12px;
+      padding: 10px;
+      margin-bottom: 16px;
+    }
+    .room-code-box .label { font-size: 0.85rem; color: rgba(255,255,255,0.6); }
+    .room-code-box .code {
+      font-size: 2rem;
+      font-weight: 900;
+      letter-spacing: 10px;
+      direction: ltr;
+      color: #ffd93d;
+      user-select: all;
+      cursor: pointer;
+    }
+    .room-code-box .hint { font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 4px; }
+
+    .status {
+      font-size: 1.15rem;
+      font-weight: 700;
+      min-height: 2em;
+      margin-bottom: 14px;
+    }
+    .status .waiting { color: #ffd93d; animation: pulse 1.5s infinite; }
+    @keyframes pulse { 50% { opacity: 0.5; } }
+
+    .symbols { display: flex; justify-content: center; gap: 30px; margin-bottom: 16px; font-size: 0.95rem; }
+    .symbols span { opacity: 0.45; transition: 0.3s; }
+    .symbols span.active { opacity: 1; font-weight: 900; }
+    .symbols .x { color: #ff6b6b; }
+    .symbols .o { color: #4ecdc4; }
+
+    /* ---- اللوحة ---- */
+    .board {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      max-width: 320px;
+      margin: 0 auto;
+    }
+    .cell {
+      aspect-ratio: 1;
+      background: rgba(255, 255, 255, 0.06);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+      border-radius: 14px;
+      font-size: 2.8rem;
+      font-weight: 900;
+      font-family: inherit;
+      color: #fff;
+      cursor: pointer;
+      transition: background 0.15s;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .cell:hover:not(:disabled) { background: rgba(255, 255, 255, 0.14); }
+    .cell:disabled { cursor: default; }
+    .cell.x { color: #ff6b6b; }
+    .cell.o { color: #4ecdc4; }
+    .cell.win { background: rgba(255, 217, 61, 0.25); border-color: #ffd93d; animation: pop 0.4s; }
+    @keyframes pop { 0% { transform: scale(0.85); } 60% { transform: scale(1.08); } 100% { transform: scale(1); } }
+
+    .result {
+      font-size: 1.5rem;
+      font-weight: 900;
+      margin: 16px 0 6px;
+      min-height: 1.6em;
+    }
+    .result.win-x { color: #ff6b6b; }
+    .result.win-o { color: #4ecdc4; }
+    .result.draw { color: #ffd93d; }
+
+    footer { margin-top: 20px; font-size: 0.8rem; color: rgba(255,255,255,0.35); }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>⚡ إكس أو أونلاين</h1>
+
+    <!-- شاشة البداية -->
+    <div id="homeScreen" class="card">
+      <button class="btn btn-primary" id="createBtn">🎮 أنشئ غرفة جديدة</button>
+      <div style="margin: 18px 0 4px; color: rgba(255,255,255,0.5);">— أو —</div>
+      <input id="codeInput" maxlength="4" placeholder="اكتب كود الغرفة" autocomplete="off" />
+      <button class="btn btn-secondary" id="joinBtn">🚪 ادخل الغرفة</button>
+      <div class="error" id="errorMsg"></div>
+    </div>
+
+    <!-- شاشة اللعبة -->
+    <div id="gameScreen" class="card hidden">
+      <div class="room-code-box">
+        <div class="label">كود الغرفة (ابعته لصاحبك)</div>
+        <div class="code" id="roomCode" title="اضغط للنسخ">----</div>
+        <div class="hint">اضغط على الكود لنسخه</div>
+      </div>
+
+      <div class="symbols">
+        <span class="x" id="labelX">أنت ❌</span>
+        <span class="o" id="labelO">⭕ صاحبك</span>
+      </div>
+
+      <div class="status" id="status"></div>
+
+      <div class="board" id="board"></div>
+      <div class="result" id="result"></div>
+      <button class="btn btn-secondary hidden" id="rematchBtn">🔄 إعادة اللعب</button>
+      <button class="btn btn-primary" id="leaveBtn" style="margin-top:12px">🚪 خروج من الغرفة</button>
+    </div>
+
+    <footer>اللاعب الأول ❌ يبدأ — بعد إعادة اللعب بتتبادل الرموز</footer>
+  </div>
+
+  <script src="/socket.io/socket.io.js"></script>
+  <script>
+    const socket = io();
+
+    // عناصر الشاشة
+    const homeScreen = document.getElementById("homeScreen");
+    const gameScreen = document.getElementById("gameScreen");
+    const boardEl = document.getElementById("board");
+    const statusEl = document.getElementById("status");
+    const resultEl = document.getElementById("result");
+    const roomCodeEl = document.getElementById("roomCode");
+    const rematchBtn = document.getElementById("rematchBtn");
+    const errorMsg = document.getElementById("errorMsg");
+
+    let mySymbol = null;
+
+    // ---- إنشاء 9 خانات مرة واحدة ----
+    const cells = [];
+    for (let i = 0; i < 9; i++) {
+      const cell = document.createElement("button");
+      cell.className = "cell";
+      cell.addEventListener("click", () => socket.emit("play", i));
+      boardEl.appendChild(cell);
+      cells.push(cell);
+    }
+
+    // ---- أزرار الشاشة الرئيسية ----
+    document.getElementById("createBtn").addEventListener("click", () => socket.emit("createRoom"));
+    document.getElementById("joinBtn").addEventListener("click", joinRoom);
+    document.getElementById("codeInput").addEventListener("keydown", (e) => {
+      if (e.key === "Enter") joinRoom();
+    });
+    document.getElementById("leaveBtn").addEventListener("click", () => location.reload());
+    document.getElementById("rematchBtn").addEventListener("click", () => socket.emit("rematch"));
+
+    // نسخ كود الغرفة
+    roomCodeEl.addEventListener("click", () => {
+      navigator.clipboard.writeText(roomCodeEl.textContent).then(() => {
+        const hint = roomCodeEl.parentElement.querySelector(".hint");
+        hint.textContent = "✅ اتنسخ!";
+        setTimeout(() => (hint.textContent = "اضغط على الكود لنسخه"), 1500);
+      });
+    });
+
+    function joinRoom() {
+      const code = document.getElementById("codeInput").value.trim();
+      if (code.length !== 4) {
+        errorMsg.textContent = "الكود لازم يكون 4 حروف";
+        return;
+      }
+      socket.emit("joinRoom", code);
+    }
+
+    // ---- من السيرفر ----
+    socket.on("joined", (data) => {
+      mySymbol = data.symbol;
+      roomCodeEl.textContent = data.code;
+      homeScreen.classList.add("hidden");
+      gameScreen.classList.remove("hidden");
+      errorMsg.textContent = "";
+      updateUI(data);
+    });
+
+    socket.on("gameUpdate", updateUI);
+
+    socket.on("error-msg", (msg) => {
+      errorMsg.textContent = msg;
+    });
+
+    // ---- تحديث الواجهة من حالة السيرفر ----
+    function updateUI(state) {
+      // اللوحة
+      state.board.forEach((value, i) => {
+        const cell = cells[i];
+        cell.textContent = value === "X" ? "✕" : value === "O" ? "◯" : "";
+        cell.className = "cell" + (value ? " " + value.toLowerCase() : "");
+        cell.disabled = value !== "" || state.playerCount < 2 || !!state.winner || state.turn !== mySymbol;
+      });
+
+      // تمييز خانات الفوز
+      if (state.winningLine) {
+        state.winningLine.forEach((i) => cells[i].classList.add("win"));
+      }
+
+      // تسميات الرموز (مين أنت ومين صاحبك)
+      const labelX = document.getElementById("labelX");
+      const labelO = document.getElementById("labelO");
+      labelX.textContent = mySymbol === "X" ? "أنت ❌" : "⭕ صاحبك".replace("⭕ ", "");
+      labelO.textContent = mySymbol === "O" ? "أنت ⭕" : "❌ صاحبك".replace("❌ ", "");
+      labelX.className = "x" + (state.turn === "X" && !state.winner ? " active" : "");
+      labelO.className = "o" + (state.turn === "O" && !state.winner ? " active" : "");
+
+      // الحالة
+      resultEl.textContent = "";
+      resultEl.className = "result";
+      rematchBtn.classList.add("hidden");
+
+      if (state.playerCount < 2) {
+        statusEl.innerHTML = '<span class="waiting">⏳ مستني صاحبك يدخل بالكود...</span>';
+        return;
+      }
+
+      if (state.winner) {
+        if (state.winner === "draw") {
+          statusEl.textContent = "انتهت الماتش";
+          resultEl.textContent = "🤝 تعادل!";
+          resultEl.className = "result draw";
+        } else if (state.winner === mySymbol) {
+          statusEl.textContent = "انتهت الماتش";
+          resultEl.textContent = "🎉 كسبت!";
+          resultEl.className = "result " + (mySymbol === "X" ? "win-x" : "win-o");
+        } else {
+          statusEl.textContent = "انتهت الماتش";
+          resultEl.textContent = "😢 خسرت";
+          resultEl.className = "result " + (mySymbol === "X" ? "win-o" : "win-x");
+        }
+        rematchBtn.classList.remove("hidden");
+        if (state.rematchVotes > 0) {
+          statusEl.textContent = "⏳ صاحبك عايز إعادة...";
+        }
+        return;
+      }
+
+      if (state.opponentLeft) {
+        statusEl.innerHTML = '<span class="waiting">🚪 صاحبك خرج من الغرفة</span>';
+        return;
+      }
+
+      statusEl.textContent = state.turn === mySymbol ? "👉 دورك!" : "⏳ دور صاحبك...";
+    }
+  </script>
+</body>
+</html>
