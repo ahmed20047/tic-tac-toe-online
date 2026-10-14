@@ -415,6 +415,9 @@
 
     // ---- تحديث الواجهة من حالة السيرفر ----
     function updateUI(state) {
+      // مهم: نزامن رمزنا مع السيرفر — بيتغير لما الرموز تتبدل بعد إعادة اللعب
+      if (state.mySymbol) mySymbol = state.mySymbol;
+
       // اللوحة
       state.board.forEach((value, i) => {
         const cell = cells[i];
