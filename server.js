@@ -13,7 +13,7 @@ const io = new Server(server);
 app.use(express.static("public"));
 
 // ============ حالة اللعبة ============
-// كل غرفة فيها: اللاعبين، اللوحة، دور مين، الكود
+// كل غرفة فيها: اللاعبين، الأسماء، اللوحة، الدور، السكور، الشات
 const rooms = {};
 
 // كل الاحتمالات اللي تكسر بها الفوز
@@ -37,25 +37,28 @@ function makeRoomCode() {
 }
 
 // ننشئ غرفة جديدة
-function createRoom() {
+function createRoom(nickname) {
   const code = makeRoomCode();
   rooms[code] = {
     code,
-    players: {}, // socket.id -> "X" أو "O"
+    players: {},                                  // socket.id -> "X" أو "O"
+    names: { X: nickname, O: "" },                // اسم كل لاعب
+    scores: { X: 0, O: 0 },                       // عدد الجولات اللي كسبها كل رمز
     board: Array(9).fill(""),
     turn: "X",
-    winner: null, // "X" / "O" / "draw"
+    winner: null,                                 // "X" / "O" / "draw"
     winningLine: null,
     rematchVotes: new Set(),
+    messages: [],                                 // شات الغرفة — بيموت مع الغرفة
   };
   return rooms[code];
 }
 
-// ننشئ غرفة للاعب الوحيد اللي في الحالة القديمة
+// نمسح الغرف الفاضية
 function cleanupEmptyRooms() {
   for (const code of Object.keys(rooms)) {
     if (Object.keys(rooms[code].players).length === 0) {
-      delete rooms[code];
+      delete rooms[code]; // الشات والسكور بيمسحوا معاها
     }
   }
 }
@@ -64,17 +67,35 @@ io.on("connection", (socket) => {
   console.log("لاعب اتصل:", socket.id);
 
   // ---- إنشاء غرفة جديدة ----
-  socket.on("createRoom", () => {
+  socket.on("createRoom", (nickname) => {
+    nickname = cleanNickname(nickname);
+    if (!nickname) {
+      socket.emit("error-msg", "اكتب اسمك الأول");
+      return;
+    }
     cleanupEmptyRooms();
-    const room = createRoom();
+    const room = createRoom(nickname);
     room.players[socket.id] = "X";
     socket.join(room.code);
-    socket.emit("joined", { code: room.code, symbol: "X", board: room.board, turn: room.turn });
+    socket.emit("joined", {
+      code: room.code,
+      symbol: "X",
+      board: room.board,
+      turn: room.turn,
+      names: room.names,
+      scores: room.scores,
+      messages: room.messages,
+    });
   });
 
   // ---- دخول غرفة بكود ----
-  socket.on("joinRoom", (code) => {
-    code = String(code || "").trim().toUpperCase();
+  socket.on("joinRoom", (data) => {
+    const code = String(data.code || "").trim().toUpperCase();
+    const nickname = cleanNickname(data.nickname);
+    if (!nickname) {
+      socket.emit("error-msg", "اكتب اسمك الأول");
+      return;
+    }
     const room = rooms[code];
     if (!room) {
       socket.emit("error-msg", "مفيش غرفة بالكود ده، اتأكد من الكود");
@@ -85,8 +106,17 @@ io.on("connection", (socket) => {
       return;
     }
     room.players[socket.id] = "O";
+    room.names.O = nickname;
     socket.join(code);
-    socket.emit("joined", { code, symbol: "O", board: room.board, turn: room.turn });
+    socket.emit("joined", {
+      code,
+      symbol: "O",
+      board: room.board,
+      turn: room.turn,
+      names: room.names,
+      scores: room.scores,
+      messages: room.messages, // نرجع له شات الغرفة القديم
+    });
     broadcast(room);
   });
 
@@ -110,13 +140,28 @@ io.on("connection", (socket) => {
     broadcast(room);
   });
 
+  // ---- رسالة شات ----
+  socket.on("chat", (text) => {
+    const room = findRoom(socket.id);
+    if (!room) return;
+
+    text = String(text || "").trim().slice(0, 200);
+    if (!text) return;
+
+    const symbol = room.players[socket.id];
+    const msg = { from: symbol, name: room.names[symbol], text };
+    room.messages.push(msg);
+    if (room.messages.length > 100) room.messages.shift(); // نحفظ آخر 100 رسالة بس
+    io.to(room.code).emit("chatMsg", msg);
+  });
+
   // ---- طلب إعادة اللعب ----
   socket.on("rematch", () => {
     const room = findRoom(socket.id);
     if (!room) return;
 
     room.rematchVotes.add(socket.id);
-    // لو الاتنين وافقوا، نبدأ من جديد ونبادل الرموز
+    // لو الاتنين وافقوا، نبدأ من جديد ونبادل الرموز (والأسماء والسكور بتفضل مع صاحبها)
     if (room.rematchVotes.size === 2) {
       room.board = Array(9).fill("");
       room.turn = "X";
@@ -128,6 +173,8 @@ io.on("connection", (socket) => {
       if (entries.length === 2) {
         room.players[entries[0][0]] = "O";
         room.players[entries[1][0]] = "X";
+        [room.names.X, room.names.O] = [room.names.O, room.names.X];
+        [room.scores.X, room.scores.O] = [room.scores.O, room.scores.X];
       }
     }
     broadcast(room);
@@ -145,12 +192,11 @@ io.on("connection", (socket) => {
 
   // ---- دوال مساعدة ----
 
-  // نرسل لكل لاعب نسخة الحالة الخاصة بيه (عشان mySymbol تختلف من واحد للتاني)
-  function broadcast(room) {
-    for (const sid of Object.keys(room.players)) {
-      io.to(sid).emit("gameUpdate", roomState(room, sid));
-    }
+  // تنظيف الاسم: قص طول، شيل مسافات زيادة — وبدون اسم رجّع فاضي
+  function cleanNickname(nickname) {
+    return String(nickname || "").trim().slice(0, 15);
   }
+
   function findRoom(sid) {
     for (const room of Object.values(rooms)) {
       if (room.players[sid]) return room;
@@ -164,11 +210,19 @@ io.on("connection", (socket) => {
       if (room.board[a] && room.board[a] === room.board[b] && room.board[a] === room.board[c]) {
         room.winner = room.board[a];
         room.winningLine = line;
+        room.scores[room.winner]++; // سكور الفايز بيزيد
         return;
       }
     }
     if (room.board.every((cell) => cell !== "")) {
       room.winner = "draw";
+    }
+  }
+
+  // نرسل لكل لاعب نسخة الحالة الخاصة بيه (عشان mySymbol تختلف من واحد للتاني)
+  function broadcast(room) {
+    for (const sid of Object.keys(room.players)) {
+      io.to(sid).emit("gameUpdate", roomState(room, sid));
     }
   }
 
@@ -181,6 +235,8 @@ io.on("connection", (socket) => {
       winningLine: room.winningLine,
       playerCount: Object.keys(room.players).length,
       mySymbol: room.players[sid] || null,
+      names: room.names,
+      scores: room.scores,
       opponentLeft: room.winner === null && Object.keys(room.players).length < 2,
       rematchVotes: room.rematchVotes.size,
     };

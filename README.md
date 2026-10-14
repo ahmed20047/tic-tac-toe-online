@@ -22,7 +22,9 @@ then open http://localhost:3000
 ## features
 
 - create/join rooms with a code
-- rematch (symbols swap every game)
+- nicknames + a running score between the two players
+- small in-game chat (lives in the room's memory, so it disappears when the room is gone)
+- rematch (symbols swap every game, score follows the player)
 - handles disconnects
 - works on mobile
 

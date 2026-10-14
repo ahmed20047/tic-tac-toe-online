@@ -69,14 +69,14 @@
       border: 2px solid rgba(255, 255, 255, 0.2);
       background: rgba(0, 0, 0, 0.25);
       color: #fff;
-      font-size: 1.2rem;
+      font-size: 1.1rem;
       text-align: center;
-      letter-spacing: 8px;
-      text-transform: uppercase;
-      direction: ltr;
     }
     input:focus { outline: none; border-color: #4ecdc4; }
-    input::placeholder { letter-spacing: 2px; font-size: 1rem; color: rgba(255,255,255,0.4); }
+    input::placeholder { color: rgba(255,255,255,0.4); font-size: 1rem; }
+
+    #codeInput { letter-spacing: 8px; text-transform: uppercase; direction: ltr; font-size: 1.2rem; }
+    #codeInput::placeholder { letter-spacing: 2px; font-size: 1rem; }
 
     .error { color: #ff6b6b; margin-top: 10px; font-size: 0.95rem; min-height: 1.4em; }
     .hidden { display: none; }
@@ -100,6 +100,33 @@
     }
     .room-code-box .hint { font-size: 0.75rem; color: rgba(255,255,255,0.45); margin-top: 4px; }
 
+    /* ---- لوحة السكور ---- */
+    .scoreboard {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 14px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+    }
+    .score-side {
+      display: flex;
+      flex-direction: column;
+      gap: 2px;
+      min-width: 100px;
+      opacity: 0.5;
+      transition: opacity 0.3s;
+    }
+    .score-side.active { opacity: 1; }
+    .score-side .who { font-size: 0.9rem; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .score-side .who.x { color: #ff6b6b; }
+    .score-side .who.o { color: #4ecdc4; }
+    .score-side .pts { font-size: 1.6rem; font-weight: 900; line-height: 1; }
+    .score-side.right { text-align: left; }
+    .score-side.left { text-align: right; }
+    .vs { font-size: 0.85rem; font-weight: 700; color: rgba(255,255,255,0.5); }
+
     .status {
       font-size: 1.15rem;
       font-weight: 700;
@@ -108,12 +135,6 @@
     }
     .status .waiting { color: #ffd93d; animation: pulse 1.5s infinite; }
     @keyframes pulse { 50% { opacity: 0.5; } }
-
-    .symbols { display: flex; justify-content: center; gap: 30px; margin-bottom: 16px; font-size: 0.95rem; }
-    .symbols span { opacity: 0.45; transition: 0.3s; }
-    .symbols span.active { opacity: 1; font-weight: 900; }
-    .symbols .x { color: #ff6b6b; }
-    .symbols .o { color: #4ecdc4; }
 
     /* ---- اللوحة ---- */
     .board {
@@ -155,6 +176,53 @@
     .result.win-o { color: #4ecdc4; }
     .result.draw { color: #ffd93d; }
 
+    /* ---- الشات ---- */
+    .chat {
+      margin-top: 18px;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 14px;
+      overflow: hidden;
+    }
+    .chat-title {
+      font-size: 0.8rem;
+      color: rgba(255,255,255,0.5);
+      padding: 8px 12px 0;
+      text-align: right;
+    }
+    .chat-messages {
+      height: 130px;
+      overflow-y: auto;
+      padding: 8px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 5px;
+      text-align: right;
+    }
+    .chat-messages .msg { font-size: 0.88rem; line-height: 1.5; word-break: break-word; }
+    .chat-messages .msg .who { font-weight: 900; }
+    .chat-messages .msg.me .who { color: #ffd93d; }
+    .chat-messages .msg.him .who { color: #a29bfe; }
+    .chat-messages .empty { color: rgba(255,255,255,0.35); font-size: 0.85rem; text-align: center; margin-top: 30px; }
+    .chat-form { display: flex; gap: 8px; padding: 8px; }
+    .chat-form input {
+      margin-top: 0;
+      padding: 10px 12px;
+      font-size: 0.95rem;
+      text-align: right;
+      flex: 1;
+    }
+    .chat-form button {
+      font-family: inherit;
+      font-weight: 700;
+      border: none;
+      border-radius: 12px;
+      background: #4ecdc4;
+      color: #16213e;
+      padding: 0 18px;
+      cursor: pointer;
+    }
+    .chat-form button:hover { filter: brightness(1.1); }
+
     footer { margin-top: 20px; font-size: 0.8rem; color: rgba(255,255,255,0.35); }
   </style>
 </head>
@@ -164,6 +232,7 @@
 
     <!-- شاشة البداية -->
     <div id="homeScreen" class="card">
+      <input id="nickInput" maxlength="15" placeholder="اكتب اسمك هنا" autocomplete="off" />
       <button class="btn btn-primary" id="createBtn">🎮 أنشئ غرفة جديدة</button>
       <div style="margin: 18px 0 4px; color: rgba(255,255,255,0.5);">— أو —</div>
       <input id="codeInput" maxlength="4" placeholder="اكتب كود الغرفة" autocomplete="off" />
@@ -179,9 +248,17 @@
         <div class="hint">اضغط على الكود لنسخه</div>
       </div>
 
-      <div class="symbols">
-        <span class="x" id="labelX">أنت ❌</span>
-        <span class="o" id="labelO">⭕ صاحبك</span>
+      <!-- لوحة السكور -->
+      <div class="scoreboard">
+        <div class="score-side right" id="sideX">
+          <span class="who x" id="nameX">—</span>
+          <span class="pts" id="scoreX">0</span>
+        </div>
+        <div class="vs">VS</div>
+        <div class="score-side left" id="sideO">
+          <span class="who o" id="nameO">—</span>
+          <span class="pts" id="scoreO">0</span>
+        </div>
       </div>
 
       <div class="status" id="status"></div>
@@ -190,9 +267,19 @@
       <div class="result" id="result"></div>
       <button class="btn btn-secondary hidden" id="rematchBtn">🔄 إعادة اللعب</button>
       <button class="btn btn-primary" id="leaveBtn" style="margin-top:12px">🚪 خروج من الغرفة</button>
+
+      <!-- الشات -->
+      <div class="chat">
+        <div class="chat-title">💬 شات</div>
+        <div class="chat-messages" id="chatMessages"></div>
+        <form class="chat-form" id="chatForm">
+          <input id="chatInput" maxlength="200" placeholder="اكتب رسالة..." autocomplete="off" />
+          <button type="submit">إرسال</button>
+        </form>
+      </div>
     </div>
 
-    <footer>اللاعب الأول ❌ يبدأ — بعد إعادة اللعب بتتبادل الرموز</footer>
+    <footer>الفائز بياخد نقطة في السكور — إعادة اللعب بتبدّل الرموز والشات بيفضل لحد ما الغرفة تختفي</footer>
   </div>
 
   <script src="/socket.io/socket.io.js"></script>
@@ -208,8 +295,14 @@
     const roomCodeEl = document.getElementById("roomCode");
     const rematchBtn = document.getElementById("rematchBtn");
     const errorMsg = document.getElementById("errorMsg");
+    const nickInput = document.getElementById("nickInput");
+    const chatMessagesEl = document.getElementById("chatMessages");
+    const chatInput = document.getElementById("chatInput");
 
     let mySymbol = null;
+
+    // نفتكر اسمه من آخر مرة (محلياً في المتصفح)
+    nickInput.value = localStorage.getItem("xo-nickname") || "";
 
     // ---- إنشاء 9 خانات مرة واحدة ----
     const cells = [];
@@ -222,13 +315,42 @@
     }
 
     // ---- أزرار الشاشة الرئيسية ----
-    document.getElementById("createBtn").addEventListener("click", () => socket.emit("createRoom"));
+    document.getElementById("createBtn").addEventListener("click", () => {
+      if (!getNickname()) return;
+      socket.emit("createRoom", getNickname());
+    });
     document.getElementById("joinBtn").addEventListener("click", joinRoom);
     document.getElementById("codeInput").addEventListener("keydown", (e) => {
       if (e.key === "Enter") joinRoom();
     });
     document.getElementById("leaveBtn").addEventListener("click", () => location.reload());
     document.getElementById("rematchBtn").addEventListener("click", () => socket.emit("rematch"));
+
+    // ---- الشات ----
+    document.getElementById("chatForm").addEventListener("submit", (e) => {
+      e.preventDefault();
+      const text = chatInput.value.trim();
+      if (!text) return;
+      socket.emit("chat", text);
+      chatInput.value = "";
+    });
+
+    function addChatMsg(msg) {
+      const empty = chatMessagesEl.querySelector(".empty");
+      if (empty) empty.remove();
+
+      const div = document.createElement("div");
+      div.className = "msg " + (msg.from === mySymbol ? "me" : "him");
+      const who = document.createElement("span");
+      who.className = "who";
+      who.textContent = msg.name + ": ";
+      div.appendChild(who);
+      div.appendChild(document.createTextNode(msg.text));
+      chatMessagesEl.appendChild(div);
+      chatMessagesEl.scrollTop = chatMessagesEl.scrollHeight;
+    }
+
+    socket.on("chatMsg", addChatMsg);
 
     // نسخ كود الغرفة
     roomCodeEl.addEventListener("click", () => {
@@ -239,13 +361,28 @@
       });
     });
 
+    // الاسم: من غيره مفيش لعب
+    function getNickname() {
+      const nick = nickInput.value.trim();
+      if (!nick) {
+        errorMsg.textContent = "اكتب اسمك الأول 😄";
+        nickInput.focus();
+        return null;
+      }
+      localStorage.setItem("xo-nickname", nick);
+      errorMsg.textContent = "";
+      return nick;
+    }
+
     function joinRoom() {
+      const nick = getNickname();
+      if (!nick) return;
       const code = document.getElementById("codeInput").value.trim();
       if (code.length !== 4) {
         errorMsg.textContent = "الكود لازم يكون 4 حروف";
         return;
       }
-      socket.emit("joinRoom", code);
+      socket.emit("joinRoom", { code, nickname: nick });
     }
 
     // ---- من السيرفر ----
@@ -255,6 +392,18 @@
       homeScreen.classList.add("hidden");
       gameScreen.classList.remove("hidden");
       errorMsg.textContent = "";
+
+      // شات الغرفة: نفضي ونحمّل اللي موجود (لو دخلنا غرفة فيها رسايل قديمة)
+      chatMessagesEl.innerHTML = "";
+      if (data.messages.length === 0) {
+        const empty = document.createElement("div");
+        empty.className = "empty";
+        empty.textContent = "مفيش رسايل — قول سلام 👋";
+        chatMessagesEl.appendChild(empty);
+      } else {
+        data.messages.forEach(addChatMsg);
+      }
+
       updateUI(data);
     });
 
@@ -279,13 +428,17 @@
         state.winningLine.forEach((i) => cells[i].classList.add("win"));
       }
 
-      // تسميات الرموز (مين أنت ومين صاحبك)
-      const labelX = document.getElementById("labelX");
-      const labelO = document.getElementById("labelO");
-      labelX.textContent = mySymbol === "X" ? "أنت ❌" : "⭕ صاحبك".replace("⭕ ", "");
-      labelO.textContent = mySymbol === "O" ? "أنت ⭕" : "❌ صاحبك".replace("❌ ", "");
-      labelX.className = "x" + (state.turn === "X" && !state.winner ? " active" : "");
-      labelO.className = "o" + (state.turn === "O" && !state.winner ? " active" : "");
+      // السكور والأسماء
+      const nameX = document.getElementById("nameX");
+      const nameO = document.getElementById("nameO");
+      nameX.textContent = "✕ " + (state.names.X || "...");
+      nameO.textContent = "◯ " + (state.names.O || "...");
+      document.getElementById("scoreX").textContent = state.scores.X;
+      document.getElementById("scoreO").textContent = state.scores.O;
+
+      // إبراز اللي دوره دلوقتي
+      document.getElementById("sideX").classList.toggle("active", state.turn === "X" && !state.winner && state.playerCount === 2);
+      document.getElementById("sideO").classList.toggle("active", state.turn === "O" && !state.winner && state.playerCount === 2);
 
       // الحالة
       resultEl.textContent = "";
@@ -304,7 +457,7 @@
           resultEl.className = "result draw";
         } else if (state.winner === mySymbol) {
           statusEl.textContent = "انتهت الماتش";
-          resultEl.textContent = "🎉 كسبت!";
+          resultEl.textContent = "🎉 كسبت يا " + state.names[mySymbol] + "!";
           resultEl.className = "result " + (mySymbol === "X" ? "win-x" : "win-o");
         } else {
           statusEl.textContent = "انتهت الماتش";
